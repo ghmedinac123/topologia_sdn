@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-server-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-server
+  template:
+    metadata:
+      labels:
+        app: web-server
+    spec:
+      containers:
+      - name: web-server
+        image: web-server:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        - containerPort: 25
+        - containerPort: 143
+        env:
+        - name: ONOS_CONTROLLER_IP
+          value: "172.17.0.3"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-server-service
+spec:
+  selector:
+    app: web-server
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  - protocol: TCP
+    port: 443
+    targetPort: 443
+  - protocol: TCP
+    port: 25
+    targetPort: 25
+  - protocol: TCP
+    port: 143
+    targetPort: 143
+  type: LoadBalancer
+
