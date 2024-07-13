@@ -19,7 +19,8 @@ RUN apt-get update && \
     git \
     python3 \
     nano \
-    openssh-server && \
+    openssh-server \
+    vlc && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
