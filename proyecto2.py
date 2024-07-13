@@ -1,52 +1,73 @@
 #!/usr/bin/python3
-"""
-This is the most simple example to showcase Containernet.
-"""
+
 from mininet.net import Containernet
-from mininet.node import Controller, RemoteController
+from mininet.node import RemoteController, OVSKernelSwitch
+from mininet.node import Host
 from mininet.cli import CLI
+from mininet.log import setLogLevel, info
 from mininet.link import TCLink
-from mininet.log import info, setLogLevel
 
-setLogLevel('info')
-net = Containernet(controller=Controller)
-info('*** Adding controller\n')
-net.addController('c0')
+def myNetwork():
 
-info('*** Adding docker containers\n')
-d1 = net.addDocker('d1', ip='10.0.0.251',
-                   dimage="nginx-rtmp:latest", ports=[1935], port_bindings={1935: 1935}, privileged=True,
-                   cap_add=['NET_ADMIN', 'SYS_MODULE', 'SYS_ADMIN', 'net_admin'])
-d2 = net.addDocker('d2', ip='10.0.0.252',
-                   dimage="user:latest", ports=[5901], port_bindings={5901: 5901}, privileged=True,
-                   cap_add=['NET_ADMIN', 'SYS_MODULE', 'SYS_ADMIN', 'net_admin'])
+    net = Containernet(topo=None,
+                       build=False,
+                       link=TCLink,
+                       ipBase='10.0.0.0/8')
 
-info('*** Adding switches\n')
-s1 = net.addSwitch('s1')
-s2 = net.addSwitch('s2')
+    info('*** Adding controller\n')
+    c0 = net.addController(name='c0',
+                           controller=RemoteController,
+                           ip='172.17.0.2',
+                           protocol='tcp',
+                           port=6653)
 
-info('*** Creating links\n')
-net.addLink(d1, s1)
-net.addLink(s1, s2)
-net.addLink(s2, d2)
+    info('*** Add switches\n')
+    s1 = net.addSwitch('s1', cls=OVSKernelSwitch, protocols=["OpenFlow13"])
+    s2 = net.addSwitch('s2', cls=OVSKernelSwitch, protocols=["OpenFlow13"])
+    s3 = net.addSwitch('s3', cls=OVSKernelSwitch, protocols=["OpenFlow13"])
 
-info('*** Starting network\n')
-net.start()
+    info('*** Add docker containers\n')
+    h1 = net.addDocker('h1', ip='10.0.0.1', dimage="server_web:latest", 
+                       ports=[80], port_bindings={80: 8080}, privileged=True, cap_add=['NET_ADMIN'])
+    h2 = net.addDocker('h2', ip='10.0.0.2', dimage="nginx:latest",
+                       ports=[1935], port_bindings={1935: 1935}, privileged=True, cap_add=['NET_ADMIN', 'SYS_MODULE', 'SYS_ADMIN', 'net_admin'])
+    h3 = net.addDocker('h3', ip='10.0.0.3', dimage="user:latest",
+                       ports=[5901], port_bindings={5901: 5901}, privileged=True, cap_add=['NET_ADMIN'])
 
-info('*** Testing connectivity\n')
-# Instead of ping, let's just check if containers are up
-info(f"d1: {d1.name} is up\n")
-info(f"d2: {d2.name} is up\n")
+    info('*** Add hosts\n')
+    h4 = net.addHost('h4', cls=Host, ip='10.0.0.4', defaultRoute=None)
+    h5 = net.addHost('h5', cls=Host, ip='10.0.0.5', defaultRoute=None)
+    h6 = net.addHost('h6', cls=Host, ip='10.0.0.6', defaultRoute=None)
 
-info('*** Running CLI\n')
-CLI(net)
+    info('*** Add links\n')
+    net.addLink(s1, s2)
+    net.addLink(s1, s3)
+    net.addLink(s2, s3)
+    net.addLink(h1, s1)
+    net.addLink(h2, s1)
+    net.addLink(h3, s2)
+    net.addLink(h4, s3)
+    net.addLink(h5, s3)
+    net.addLink(h6, s3)
 
-# Agregar comandos de diagnóstico
-info('*** Diagnóstico dentro del contenedor d2\n')
-d2.cmd('ip addr show')
-d2.cmd('ifconfig')
-d2.cmd('dmesg | tail')
+    info('*** Starting network\n')
+    net.build()
 
-info('*** Stopping network\n')
-net.stop()
+    info('*** Starting controllers\n')
+    for controller in net.controllers:
+        controller.start()
+
+    info('*** Starting switches\n')
+    net.get('s1').start([c0])
+    net.get('s2').start([c0])
+    net.get('s3').start([c0])
+
+    info('*** Post configure switches and hosts\n')
+
+    CLI(net)
+    net.stop()
+
+if __name__ == '__main__':
+    setLogLevel('info')
+    myNetwork()
 
